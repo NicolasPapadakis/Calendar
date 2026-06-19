@@ -40,6 +40,7 @@
   let rawEvents = [];
   let root, scrollEl, nowEl, didAutoScroll = false;
   let sbEl, sbThumb, sbHideTimer;
+  let lastStatus = "";
 
   // ── Public API ────────────────────────────────────────────────────────────
   const Calendar = {
@@ -56,7 +57,12 @@
     root = document.getElementById("cal");
     if (!root) return;
     render();
-    tryLoadJson();                                  // optional override if served
+    if (window.calendarBridge) {                    // Electron: data comes over IPC
+      window.calendarBridge.onEvents((evts) => Calendar.setEvents(evts));
+      window.calendarBridge.onStatus(setStatus);
+    } else {
+      tryLoadJson();                                // browser dev: optional events.json
+    }
     setInterval(updateNow, 30 * 1000);              // keep the red line live
     window.addEventListener("resize", updateScrollbar);
   }
@@ -159,7 +165,9 @@
     const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(now);
 
     root.innerHTML = `
-      <div class="cal-topbar"><span class="cal-month">${monthLabel}</span></div>
+      <div class="cal-topbar"><span class="cal-month">${monthLabel}</span>${
+        window.calendarBridge ? `<button class="cal-gear" title="Settings" aria-label="Settings">⚙</button>` : ""
+      }</div>
       <div class="cal-headrow">
         <div class="cal-spacer"></div>
         ${days.map((d) => dayHead(d, now)).join("")}
@@ -188,6 +196,13 @@
         openPopover(JSON.parse(el.dataset.evt), el);
       });
     });
+
+    const gear = root.querySelector(".cal-gear");
+    if (gear) gear.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.calendarBridge && window.calendarBridge.openSettings();
+    });
+    applyStatus();   // re-attach any standing status message (innerHTML wiped it)
 
     scrollEl = root.querySelector(".cal-scroll");
     nowEl = root.querySelector("#cal-now");
@@ -396,6 +411,16 @@
       return base + ", until " + new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(u);
     }
     return base;
+  }
+
+  // ── Status toast (load errors / "set up your calendar") ───────────────────
+  function setStatus(msg) { lastStatus = msg || ""; applyStatus(); }
+  function applyStatus() {
+    if (!root) return;
+    let t = root.querySelector(".cal-toast");
+    if (!lastStatus) { if (t) t.remove(); return; }
+    if (!t) { t = document.createElement("div"); t.className = "cal-toast"; root.appendChild(t); }
+    t.textContent = lastStatus;
   }
 
   // ── Small utilities ───────────────────────────────────────────────────────

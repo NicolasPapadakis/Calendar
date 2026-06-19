@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Calendar — Settings</title>
+<style>
+  :root {
+    --font: -apple-system, "Segoe UI", "Inter", system-ui, sans-serif;
+    --accent: #007aff;
+    --ink: #1d1d1f;
+    --sub: #6e6e73;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: #f5f5f7;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 22px 18px;
+  }
+  h1 { font-size: 15px; font-weight: 700; margin: 0 0 3px; }
+  p.hint { font-size: 12px; color: var(--sub); margin: 0 0 14px; line-height: 1.4; }
+  label { font-size: 12px; font-weight: 600; color: var(--sub); display: block; margin-bottom: 5px; }
+  input[type="text"] {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid #d2d2d7;
+    border-radius: 8px;
+    outline: none;
+    background: #fff;
+  }
+  input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
+  .startup { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--ink); }
+  .startup input { width: 15px; height: 15px; accent-color: var(--accent); }
+  .row { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; padding-top: 16px; }
+  button {
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  .secondary { background: #fff; border-color: #d2d2d7; color: var(--ink); }
+  .primary { background: var(--accent); color: #fff; }
+  .primary:disabled { opacity: 0.45; cursor: default; }
+</style>
+</head>
+<body>
+  <h1>Published calendar link</h1>
+  <p class="hint">Paste your iCloud <b>public</b> calendar URL (Calendar → Share → Public Calendar).
+     <code>webcal://</code> and <code>https://</code> links both work.</p>
+  <label for="url">Calendar URL</label>
+  <input id="url" type="text" placeholder="https://p…-caldav.icloud.com/published/2/…" spellcheck="false" />
+  <label class="startup"><input id="startup" type="checkbox" /> Open automatically when I log in</label>
+  <div class="row">
+    <button class="secondary" id="cancel">Cancel</button>
+    <button class="primary" id="save">Save</button>
+  </div>
+
+  <script>
+    const input = document.getElementById("url");
+    const startup = document.getElementById("startup");
+    const save = document.getElementById("save");
+    settingsAPI.get().then((s) => {
+      input.value = s.url || "";
+      startup.checked = !!s.openAtLogin;
+      input.focus(); input.select();
+    });
+    function commit() { settingsAPI.save({ url: input.value, openAtLogin: startup.checked }); }
+    save.addEventListener("click", commit);
+    document.getElementById("cancel").addEventListener("click", () => settingsAPI.cancel());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") commit();
+      if (e.key === "Escape") settingsAPI.cancel();
+    });
+  </script>
+</body>
+</html>
