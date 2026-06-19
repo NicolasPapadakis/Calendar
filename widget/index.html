@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar Widget</title>
+  <!-- Desktop shell loads this with ?overlay=1 → transparent, fills the window -->
+  <script>if (new URLSearchParams(location.search).has("overlay")) document.documentElement.classList.add("overlay");</script>
+  <!-- Windows fallback for SF Pro (closest matching metrics). Mac/iOS use SF directly. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="calendar.css" />
+</head>
+<body>
+  <!-- The widget. Python feeds it via Calendar.setEvents([...]) — see events.js. -->
+  <div id="cal" class="cal"></div>
+
+  <script src="calendar.js"></script>
+  <script src="events.js"></script>
+</body>
+</html>

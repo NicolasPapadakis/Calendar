@@ -1,0 +1,397 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Apple Calendar — week view, as a translucent desktop widget.
+   SF Pro is the target face; Inter is the Windows fallback (closest SF metrics).
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --font: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont,
+          "Inter", "Helvetica Neue", system-ui, sans-serif;
+
+  --mat:        rgba(250, 250, 252, 0.72);   /* vibrancy material */
+  --mat-head:   rgba(255, 255, 255, 0.55);
+  --ink:        #1d1d1f;
+  --ink-2:      #3c3c43;
+  --sub:        rgba(60, 60, 67, 0.6);
+  --faint:      rgba(60, 60, 67, 0.30);
+  --line:       rgba(60, 60, 67, 0.10);
+  --line-soft:  rgba(60, 60, 67, 0.07);
+  --today:      #ff3b30;
+  --radius:     18px;
+  --gutter:     46px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+/* Definite height so percentage heights resolve; hidden so no stray native bar */
+html, body { height: 100%; overflow: hidden; }
+
+/* ── Demo desktop backdrop (so the widget's translucency reads correctly) ──── */
+body {
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  padding: 4vh 4vw;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background:
+    radial-gradient(120% 120% at 18% 12%, #ffd9a0 0%, transparent 45%),
+    radial-gradient(120% 120% at 82% 22%, #ffb3d9 0%, transparent 40%),
+    radial-gradient(140% 140% at 78% 88%, #7ec8ff 0%, transparent 50%),
+    radial-gradient(120% 120% at 22% 82%, #c9a0ff 0%, transparent 50%),
+    linear-gradient(135deg, #2a3a6b 0%, #38477e 40%, #5a4d8c 100%);
+  background-attachment: fixed;
+}
+
+/* ── Overlay mode: running inside the desktop shell (transparent window) ───── */
+/* Activated by ?overlay=1 — drops the demo backdrop so only the widget shows
+   over your real wallpaper, fills the window, and lets the top bar drag it. */
+html.overlay, html.overlay body { background: transparent; }
+/* Small gutter so the OS resize edge sits just outside the visual border
+   (smaller = you can grab the resize handle closer to the widget edge). */
+html.overlay body { display: block; padding: 6px; }
+html.overlay .cal { width: 100%; height: 100%; margin: 0; }
+html.overlay .cal-topbar { -webkit-app-region: drag; cursor: grab; }
+html.overlay .cal-evt,
+html.overlay .cal-scroll,
+html.overlay .cal-pop,
+html.overlay .cal-pop-backdrop { -webkit-app-region: no-drag; }
+
+/* ── Widget shell: ~1/3 width × 1/3 height (≈ 1/9 of the screen) ──────────── */
+.cal {
+  position: relative;
+  width: clamp(418px, 36.67vw, 616px);
+  height: clamp(363px, 36.67vh, 594px);
+  margin-left: auto;                 /* park it top-right like a desktop widget */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--mat);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  backdrop-filter: blur(34px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 24px 60px -12px rgba(0, 0, 0, 0.45),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+  color: var(--ink);
+  animation: cal-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes cal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Top bar (month / year) ───────────────────────────────────────────────── */
+.cal-topbar {
+  padding: 11px 14px 7px;
+  background: var(--mat-head);
+  border-bottom: 0.5px solid var(--line);
+}
+.cal-month {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+/* ── Day header row ───────────────────────────────────────────────────────── */
+.cal-headrow {
+  display: flex;
+  background: var(--mat-head);
+  border-bottom: 0.5px solid var(--line);
+}
+.cal-spacer { width: var(--gutter); flex: 0 0 var(--gutter); }
+.cal-dayhead {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 0 7px;
+  border-left: 0.5px solid var(--line-soft);
+}
+.cal-dow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.cal-dnum {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.cal-dayhead.is-today .cal-dow { color: var(--today); }
+.cal-dayhead.is-today .cal-dnum {
+  color: #fff;
+  background: var(--today);
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── All-day band ─────────────────────────────────────────────────────────── */
+.cal-allday {
+  display: flex;
+  max-height: 60px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.28);
+  border-bottom: 0.5px solid var(--line);
+}
+.cal-allspacer {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 5px;
+  text-align: right;
+}
+.cal-allcell {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 3px 1px;
+  border-left: 0.5px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cal-allpill {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: #fff;
+  background: var(--c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* ── Scrollable time grid ─────────────────────────────────────────────────── */
+.cal-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;          /* native bar hidden — we draw our own */
+  -ms-overflow-style: none;
+}
+.cal-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.cal-body { position: relative; }
+
+/* Custom overlay scrollbar — thin pill on the right, auto-fades (Apple-style) */
+.cal-sb {
+  position: absolute;
+  right: 3px;
+  width: 9px;
+  z-index: 7;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.cal-sb.is-active { opacity: 1; pointer-events: auto; }
+.cal-sb-thumb {
+  position: absolute;
+  right: 0; top: 0;
+  width: 6px;
+  border-radius: 3px;
+  background: rgba(60, 60, 67, 0.38);
+  transition: width 0.12s ease, background 0.12s ease;
+}
+.cal-sb:hover .cal-sb-thumb,
+.cal-sb.is-dragging .cal-sb-thumb {
+  width: 9px;
+  background: rgba(60, 60, 67, 0.55);
+}
+
+.cal-times {
+  position: absolute;
+  left: 0; top: 0;
+  width: var(--gutter);
+  height: 100%;
+}
+.cal-time {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--faint);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.cal-time.is-first { transform: none; }   /* 12 AM sits flush at the top, not clipped */
+
+.cal-canvas {
+  position: absolute;
+  left: var(--gutter);
+  right: 0; top: 0;
+  height: 100%;
+  display: flex;
+}
+.cal-hline {
+  position: absolute;
+  left: 0; right: 0;
+  height: 0;
+  border-top: 0.5px solid var(--line);
+  pointer-events: none;
+}
+.cal-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  border-left: 0.5px solid var(--line-soft);
+}
+.cal-col.is-last { border-right: 0.5px solid var(--line-soft); }
+
+/* ── Event blocks ─────────────────────────────────────────────────────────── */
+.cal-evt { cursor: pointer; }
+.cal-block {
+  position: absolute;
+  overflow: hidden;
+  padding: 2px 5px;
+  border-radius: 5px;
+  border-left: 2.5px solid var(--c);
+  background: color-mix(in srgb, var(--c) 16%, white);
+  color: color-mix(in srgb, var(--c) 78%, black);
+  transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+.cal-block:hover {
+  filter: saturate(1.05) brightness(0.99);
+  box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--c) 60%, transparent);
+  z-index: 5;
+}
+.cal-evt-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-evt-time {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 500;
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-block.is-compact { padding: 0 5px; display: flex; align-items: center; gap: 4px; }
+.cal-block.is-compact .cal-evt-title { font-size: 10px; }
+.cal-block.is-compact .cal-evt-time { display: none; }
+
+/* ── Live red "now" line ──────────────────────────────────────────────────── */
+.cal-now {
+  position: absolute;
+  left: 0; right: 0;
+  height: 0;
+  border-top: 1.5px solid var(--today);
+  z-index: 6;
+  pointer-events: none;
+}
+.cal-now-dot {
+  position: absolute;
+  left: -4px; top: -4.5px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--today);
+  box-shadow: 0 0 0 2px rgba(255, 59, 48, 0.18);
+}
+
+/* ── Event popover (detail inspector) ─────────────────────────────────────── */
+.cal-pop-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.04);
+}
+.cal-pop {
+  position: absolute;
+  width: 240px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: 13px 14px 14px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.4);
+  animation: pop-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+.cal-pop-x {
+  position: absolute;
+  top: 8px; right: 9px;
+  width: 20px; height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(60, 60, 67, 0.1);
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.cal-pop-x:hover { background: rgba(60, 60, 67, 0.2); }
+.cal-pop-head { display: flex; align-items: flex-start; gap: 7px; padding-right: 18px; }
+.cal-pop-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex: 0 0 auto;
+}
+.cal-pop-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.cal-pop-when {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+.cal-pop-time { color: var(--sub); }
+.cal-pop-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 0.5px solid var(--line);
+  font-size: 12px;
+}
+.cal-pop-label { color: var(--sub); flex: 0 0 64px; }
+.cal-pop-val { color: var(--ink-2); font-weight: 500; display: flex; align-items: center; gap: 5px; }
+.cal-pop-cdot { width: 8px; height: 8px; border-radius: 50%; }
+.cal-pop-notes {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 0.5px solid var(--line);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}

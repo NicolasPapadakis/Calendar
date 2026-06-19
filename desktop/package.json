@@ -1,0 +1,13 @@
+{
+  "name": "calendar-widget-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Borderless transparent desktop shell for the calendar widget",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.3.0"
+  }
+}
