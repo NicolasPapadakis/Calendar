@@ -5,9 +5,47 @@
   "description": "Borderless transparent desktop shell for the calendar widget",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^31.3.0"
+    "electron": "^31.3.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "node-ical": "^0.20.1"
+  },
+  "build": {
+    "appId": "com.nikolaspapadakis.calendarwidget",
+    "productName": "Calendar Widget",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "calendar-data.js",
+      "preload.js",
+      "settings.html"
+    ],
+    "extraResources": [
+      {
+        "from": "../widget",
+        "to": "widget",
+        "filter": [
+          "**/*",
+          "!README.md",
+          "!_*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
