@@ -7,7 +7,7 @@
 const { app, BrowserWindow, globalShortcut, screen, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { fetchEventsFromUrl } = require("./calendar-data");
+const { fetchEventsFromUrls } = require("./calendar-data");
 
 const REFRESH_MS = 15 * 60 * 1000;                 // re-fetch the feed every 15 min
 
@@ -58,16 +58,20 @@ function createWindow() {
     },
   });
 
-  win.loadFile(widgetFile("index.html"), { search: "overlay=1" });
+  // Stamp the saved theme into the URL so the first paint is already dark
+  // (no light→dark flash); runtime changes still come live over IPC.
+  const search = "overlay=1" + (loadConfig().theme === "dark" ? "&theme=dark" : "");
+  win.loadFile(widgetFile("index.html"), { search });
   win.setAlwaysOnTop(false);
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
 
   win.webContents.on("did-finish-load", () => {
     ready = true;
     if (pendingEvents) { win.webContents.send("events:update", pendingEvents); pendingEvents = null; }
+    sendTheme(loadConfig().theme || "light");   // re-apply theme after any (re)load
     capHeight();   // cap max height at the fully-revealed schedule (no grey gap)
     refresh();     // pull fresh events for this (re)load
-    if (!(loadConfig().url || "").trim()) openSettings();   // first-run prompt
+    if (!(loadConfig().urls || []).length) openSettings();   // first-run prompt
   });
 }
 
@@ -92,9 +96,9 @@ function capHeight() {
 
 // ── Data layer: fetch → convert (see calendar-data.js) ───────────────────────
 async function fetchEvents() {
-  const url = (loadConfig().url || "").trim();
-  if (!url) return { needsSetup: true };
-  return { events: await fetchEventsFromUrl(url) };
+  const urls = (loadConfig().urls || []);
+  if (!urls.length) return { needsSetup: true };
+  return { events: await fetchEventsFromUrls(urls) };
 }
 
 // ── Push to renderer ─────────────────────────────────────────────────────────
@@ -104,6 +108,9 @@ function sendEvents(events) {
 }
 function sendStatus(msg) {
   if (win && !win.isDestroyed() && ready) win.webContents.send("events:status", msg);
+}
+function sendTheme(theme) {
+  if (win && !win.isDestroyed() && ready) win.webContents.send("theme:update", theme);
 }
 
 async function refresh() {
@@ -121,13 +128,16 @@ async function refresh() {
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({
-    width: 460,
-    height: 290,
+    width: 440,
+    height: 300,                  // initial guess; the page resizes us on load
     resizable: false,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    title: "Calendar — Settings",
+    frame: false,                 // match the widget: no native title bar
+    transparent: true,            // let the sheet's rounded corners show through
+    hasShadow: false,             // the sheet draws its own shadow in CSS
+    backgroundColor: "#00000000",
     parent: win,
     show: false,
     webPreferences: {
@@ -136,7 +146,9 @@ function openSettings() {
     },
   });
   settingsWin.setMenuBarVisibility(false);
-  settingsWin.loadFile(path.join(__dirname, "settings.html"));
+  settingsWin.loadFile(path.join(__dirname, "settings.html"), {
+    search: loadConfig().theme === "dark" ? "theme=dark" : "",
+  });
   settingsWin.once("ready-to-show", () => settingsWin.show());
   settingsWin.on("closed", () => { settingsWin = null; });
 }
@@ -148,19 +160,36 @@ function closeSettings() {
 app.whenReady().then(() => {
   ipcMain.on("events:refresh", refresh);
   ipcMain.on("settings:open", openSettings);
-  ipcMain.handle("settings:get", () => ({
-    url: loadConfig().url || "",
-    openAtLogin: app.getLoginItemSettings().openAtLogin,
-  }));
+  ipcMain.on("window:close", () => app.quit());
+  ipcMain.handle("settings:get", () => {
+    const cfg = loadConfig();
+    return {
+      urls: cfg.urls || [],
+      openAtLogin: app.getLoginItemSettings().openAtLogin,
+      theme: cfg.theme || "light",
+    };
+  });
   ipcMain.on("settings:save", (_e, s) => {
     const cfg = loadConfig();
-    cfg.url = String((s && s.url) || "").trim();
+    cfg.urls = (s && s.urls) || [];
+    cfg.theme = (s && s.theme) === "dark" ? "dark" : "light";
     saveConfig(cfg);
     app.setLoginItemSettings({ openAtLogin: !!(s && s.openAtLogin) });
+    sendTheme(cfg.theme);
     closeSettings();
     refresh();
   });
   ipcMain.on("settings:cancel", closeSettings);
+  // Live theme preview from the switch — applies to the widget without saving.
+  ipcMain.on("theme:preview", (_e, theme) => sendTheme(theme === "dark" ? "dark" : "light"));
+  // The settings page grows the window as calendar rows are added/removed.
+  ipcMain.on("settings:resize", (_e, h) => {
+    if (!settingsWin || settingsWin.isDestroyed()) return;
+    const { workArea } = screen.getPrimaryDisplay();
+    const height = Math.min(Math.max(Math.round(h) || 0, 200), workArea.height - 40);
+    const [w] = settingsWin.getSize();
+    settingsWin.setContentSize(w, height);
+  });
 
   createWindow();
   setInterval(refresh, REFRESH_MS);

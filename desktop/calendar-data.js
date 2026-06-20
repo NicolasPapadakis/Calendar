@@ -84,11 +84,15 @@ function parseICS(icsText) {
   return convertEvents(ical.sync.parseICS(normalized));
 }
 
-async function fetchEventsFromUrl(url) {
-  const target = url.trim().replace(/^webcal:\/\//i, "https://");
-  const res = await fetch(target);
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return parseICS(await res.text());
+
+async function fetchEventsFromUrls(urls) {
+  const results = await Promise.allSettled(urls.map(async (url) => {
+    const target = String(url).trim().replace(/^webcal:\/\//i, "https://");
+    const res = await fetch(target);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return parseICS(await res.text());
+  }));
+  return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
 }
 
-module.exports = { convertEvents, parseICS, fetchEventsFromUrl };
+module.exports = { convertEvents, parseICS, fetchEventsFromUrls };
