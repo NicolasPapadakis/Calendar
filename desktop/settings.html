@@ -3,82 +3,407 @@
 <head>
 <meta charset="utf-8" />
 <title>Calendar — Settings</title>
+<!-- Apply the saved theme before first paint so the sheet doesn't flash light. -->
+<script>if (new URLSearchParams(location.search).get("theme") === "dark") document.documentElement.classList.add("dark");</script>
 <style>
+  /* Mirrors the widget's vibrancy material (see widget/calendar.css) so the
+     settings sheet reads as the same surface, just turned around. */
   :root {
-    --font: -apple-system, "Segoe UI", "Inter", system-ui, sans-serif;
-    --accent: #007aff;
-    --ink: #1d1d1f;
-    --sub: #6e6e73;
+    --font: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont,
+            "Segoe UI", "Inter", system-ui, sans-serif;
+    --mat:       rgba(250, 250, 252, 0.72);
+    --mat-head:  rgba(255, 255, 255, 0.55);
+    --field:     rgba(255, 255, 255, 0.5);
+    --ink:       #1d1d1f;
+    --ink-2:     #3c3c43;
+    --sub:       rgba(60, 60, 67, 0.6);
+    --faint:     rgba(60, 60, 67, 0.3);
+    --line:      rgba(60, 60, 67, 0.1);
+    --line-soft: rgba(60, 60, 67, 0.07);
+    --accent:    #007aff;
+    --radius:    18px;
+    --pad:       16px;          /* must equal PAD in the script + main.js shadow room */
   }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  /* Dark mode — same Apple-dark palette as the widget (calendar.css). Toggled
+     live on <html> by the appearance switch. */
+  html.dark {
+    --mat:       rgba(28, 28, 30, 0.86);
+    --mat-head:  rgba(60, 60, 66, 0.55);
+    --field:     rgba(255, 255, 255, 0.07);
+    --ink:       #ffffff;
+    --ink-2:     rgba(235, 235, 245, 0.85);
+    --sub:       rgba(235, 235, 245, 0.6);
+    --faint:     rgba(235, 235, 245, 0.3);
+    --line:      rgba(255, 255, 255, 0.12);
+    --line-soft: rgba(255, 255, 255, 0.07);
+    --accent:    #0a84ff;
+  }
+  /* Cross-fade the sheet's surfaces/text when the theme flips (only the few
+     hard-coded light values below need explicit dark overrides). */
+  .sheet, .bar, .title, .hint, .startup, .url {
+    transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+  }
+  html.dark .x { background: rgba(255, 255, 255, 0.12); }
+  html.dark .x:hover { background: rgba(255, 255, 255, 0.22); }
+  html.dark .hint code { background: rgba(255, 255, 255, 0.1); }
+  html.dark .ghost { background: rgba(255, 255, 255, 0.1); }
+  html.dark .ghost:hover { background: rgba(255, 255, 255, 0.16); }
+  html.dark .primary:hover { background: #3094ff; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
   body {
     font-family: var(--font);
     color: var(--ink);
-    background: #f5f5f7;
+    background: transparent;
+    overflow: hidden;
+    padding: var(--pad);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ── The sheet: same material/shadow recipe as .cal ─────────────────────── */
+  .sheet {
     display: flex;
     flex-direction: column;
-    padding: 20px 22px 18px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--mat);
+    -webkit-backdrop-filter: blur(34px) saturate(180%);
+    backdrop-filter: blur(34px) saturate(180%);
+    border: 0.5px solid rgba(255, 255, 255, 0.55);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 24px 60px -12px rgba(0, 0, 0, 0.45),
+      0 6px 18px rgba(0, 0, 0, 0.18);
+    animation: sheet-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  h1 { font-size: 15px; font-weight: 700; margin: 0 0 3px; }
-  p.hint { font-size: 12px; color: var(--sub); margin: 0 0 14px; line-height: 1.4; }
-  label { font-size: 12px; font-weight: 600; color: var(--sub); display: block; margin-bottom: 5px; }
-  input[type="text"] {
+  @keyframes sheet-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ── Title bar — same lighter material band as the widget's top bar ─────── */
+  .bar {
+    -webkit-app-region: drag;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 12px 9px 15px;
+    background: var(--mat-head);
+    border-bottom: 0.5px solid var(--line);
+  }
+  .title { font-size: 14px; font-weight: 700; letter-spacing: -0.015em; }
+  .x {
+    -webkit-app-region: no-drag;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 50%;
+    background: rgba(60, 60, 67, 0.1);
+    color: var(--ink-2);
+    font-size: 12px; line-height: 1;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .x:hover { background: rgba(60, 60, 67, 0.2); }
+
+  /* ── Body ───────────────────────────────────────────────────────────────── */
+  .body { padding: 13px 15px 4px; }
+  .hint { font-size: 11.5px; color: var(--sub); line-height: 1.4; margin-bottom: 11px; }
+  .hint code {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: 10.5px;
+    background: rgba(60, 60, 67, 0.08);
+    padding: 1px 4px; border-radius: 4px;
+  }
+
+  /* ── Calendar rows ──────────────────────────────────────────────────────── */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: var(--field);
+    border: 0.5px solid var(--line);
+    border-radius: 11px;
+    padding: 7px 8px 7px 11px;
+    margin-bottom: 7px;
+    transition: background-color 0.4s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+    animation: row-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .row:focus-within {
+    border-color: rgba(0, 122, 255, 0.55);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.13);
+  }
+  .row.leaving { animation: row-out 0.2s cubic-bezier(0.4, 0, 1, 1) both; }
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes row-out {
+    from { opacity: 1; max-height: 52px; margin-bottom: 7px; }
+    to   { opacity: 0; transform: translateX(10px);
+           max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; border-width: 0; }
+  }
+
+  /* Per-calendar colour dot — same idea as the widget's event colours */
+  .dot {
+    flex: 0 0 auto;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--c, var(--accent));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--c, var(--accent)) 16%, transparent);
+  }
+  .url {
+    flex: 1 1 auto;
+    min-width: 0;
+    -webkit-app-region: no-drag;
+    font-family: var(--font);
+    font-size: 12.5px;
+    color: var(--ink);
+    border: none; outline: none;
+    background: transparent;
+    padding: 2px 0;
+  }
+  .url::placeholder { color: var(--faint); }
+  .remove {
+    -webkit-app-region: no-drag;
+    flex: 0 0 auto;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 50%;
+    background: transparent;
+    color: var(--sub);
+    font-size: 15px; line-height: 1;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+  }
+  .remove:hover { background: rgba(255, 59, 48, 0.13); color: #ff3b30; opacity: 1; }
+
+  /* ── Add affordance ─────────────────────────────────────────────────────── */
+  .add {
+    -webkit-app-region: no-drag;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
     width: 100%;
+    margin-top: 1px;
     font-family: var(--font);
-    font-size: 13px;
-    padding: 8px 10px;
-    border: 1px solid #d2d2d7;
-    border-radius: 8px;
-    outline: none;
-    background: #fff;
+    font-size: 12px; font-weight: 600;
+    color: var(--accent);
+    background: transparent;
+    border: 1px dashed rgba(0, 122, 255, 0.38);
+    border-radius: 11px;
+    padding: 8px;
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease;
   }
-  input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
-  .startup { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--ink); }
-  .startup input { width: 15px; height: 15px; accent-color: var(--accent); }
-  .row { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; padding-top: 16px; }
-  button {
+  .add:hover { background: rgba(0, 122, 255, 0.07); border-color: rgba(0, 122, 255, 0.6); }
+  .add-plus { font-size: 14px; font-weight: 500; transform: translateY(-0.5px); }
+
+  /* ── Footer ─────────────────────────────────────────────────────────────── */
+  .startup {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 13px;
+    font-size: 12.5px; color: var(--ink-2);
+  }
+  .startup input { -webkit-app-region: no-drag; width: 15px; height: 15px; accent-color: var(--accent); }
+  .foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 15px 15px;
+  }
+  .foot-actions { display: flex; gap: 8px; }
+
+  /* ── Day / night switch — dial slides, revealing the opposite icon ──────── */
+  .theme-switch {
+    -webkit-app-region: no-drag;
+    position: relative;
+    width: 56px; height: 28px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0.5px solid var(--line);
+    border-radius: 999px;
+    cursor: pointer;
+    overflow: hidden;
+    background: linear-gradient(135deg, #d8ecff 0%, #f2f8ff 100%);     /* day sky */
+    transition: background 0.4s ease, border-color 0.3s ease;
+  }
+  html.dark .theme-switch {
+    background: linear-gradient(135deg, #1d2138 0%, #353a5e 100%);     /* night sky */
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+  .tw-icon {
+    position: absolute; top: 50%;
+    width: 13px; height: 13px;
+    transform: translateY(-50%);
+    transition: opacity 0.3s ease;
+  }
+  /* moon hides at left, sun shows at right (light); they swap in dark */
+  .tw-moon { left: 8px;  fill: #c7ccff; opacity: 0; }
+  .tw-sun  { right: 8px; stroke: #ff9f0a; fill: #ff9f0a; stroke-width: 1.6;
+             stroke-linecap: round; opacity: 1; }
+  .tw-sun line { stroke: #ff9f0a; }
+  html.dark .tw-moon { opacity: 1; }
+  html.dark .tw-sun  { opacity: 0; }
+  .tw-dial {
+    position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #eef0f4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+    transition: transform 0.34s cubic-bezier(0.34, 1.4, 0.5, 1), background 0.3s ease;
+  }
+  html.dark .tw-dial {
+    transform: translateX(28px);
+    background: radial-gradient(circle at 35% 30%, #eef0ff, #c6ccef);
+  }
+  .btn {
+    -webkit-app-region: no-drag;
     font-family: var(--font);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 7px 16px;
-    border-radius: 8px;
-    border: 1px solid transparent;
+    font-size: 12.5px; font-weight: 600;
+    padding: 7px 17px;
+    border-radius: 9px;
+    border: 0.5px solid transparent;
     cursor: pointer;
   }
-  .secondary { background: #fff; border-color: #d2d2d7; color: var(--ink); }
+  .ghost { background: rgba(255, 255, 255, 0.55); border-color: var(--line); color: var(--ink); }
+  .ghost:hover { background: rgba(255, 255, 255, 0.8); }
   .primary { background: var(--accent); color: #fff; }
-  .primary:disabled { opacity: 0.45; cursor: default; }
+  .primary:hover { background: #0a6ce0; }
 </style>
 </head>
 <body>
-  <h1>Published calendar link</h1>
-  <p class="hint">Paste your iCloud <b>public</b> calendar URL (Calendar → Share → Public Calendar).
-     <code>webcal://</code> and <code>https://</code> links both work.</p>
-  <label for="url">Calendar URL</label>
-  <input id="url" type="text" placeholder="https://p…-caldav.icloud.com/published/2/…" spellcheck="false" />
-  <label class="startup"><input id="startup" type="checkbox" /> Open automatically when I log in</label>
-  <div class="row">
-    <button class="secondary" id="cancel">Cancel</button>
-    <button class="primary" id="save">Save</button>
+  <div class="sheet">
+    <div class="bar">
+      <span class="title">Calendar Links</span>
+      <button class="x" id="close" title="Close">&#10005;</button>
+    </div>
+    <div class="body">
+      <p class="hint">Paste your iCloud <b>public</b> calendar links (Calendar → Share → Public Calendar).
+         <code>webcal://</code> and <code>https://</code> both work.</p>
+      <div id="list"></div>
+      <button class="add" id="add"><span class="add-plus">+</span> Add calendar</button>
+      <label class="startup"><input id="startup" type="checkbox" /> Open automatically when I log in</label>
+    </div>
+    <div class="foot">
+      <button class="theme-switch" id="theme" role="switch" aria-checked="false"
+              aria-label="Dark mode" title="Toggle dark mode">
+        <svg class="tw-icon tw-moon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" />
+        </svg>
+        <svg class="tw-icon tw-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" fill="#ff9f0a" />
+          <line x1="12" y1="2"    x2="12"   y2="4.5"  /><line x1="12"   y1="19.5" x2="12"   y2="22"  />
+          <line x1="2"  y1="12"   x2="4.5"  y2="12"   /><line x1="19.5" y1="12"   x2="22"   y2="12"  />
+          <line x1="5.6" y1="5.6" x2="7.4"  y2="7.4"  /><line x1="16.6" y1="16.6" x2="18.4" y2="18.4"/>
+          <line x1="16.6" y1="7.4" x2="18.4" y2="5.6" /><line x1="5.6"  y1="18.4" x2="7.4"  y2="16.6"/>
+        </svg>
+        <span class="tw-dial"></span>
+      </button>
+      <div class="foot-actions">
+        <button class="btn ghost" id="cancel">Cancel</button>
+        <button class="btn primary" id="save">Save</button>
+      </div>
+    </div>
   </div>
 
   <script>
-    const input = document.getElementById("url");
+    // Apple-Calendar-flavoured palette; the dot is a visual cue so each link is
+    // distinguishable. Cycles if there are more rows than colours.
+    const PALETTE = ["#007aff", "#ff3b30", "#34c759", "#ff9500", "#af52de",
+                     "#5ac8fa", "#ff2d55", "#ffcc00", "#5856d6"];
+    const PAD = 16;   // keep in sync with --pad
+
+    const list = document.getElementById("list");
+    const sheet = document.querySelector(".sheet");
     const startup = document.getElementById("startup");
-    const save = document.getElementById("save");
-    settingsAPI.get().then((s) => {
-      input.value = s.url || "";
-      startup.checked = !!s.openAtLogin;
-      input.focus(); input.select();
+    const themeSwitch = document.getElementById("theme");
+
+    let theme = "light";        // current (previewed) theme
+    let savedTheme = "light";   // theme to revert to if the user cancels
+    function applyThemeUI() {
+      const dark = theme === "dark";
+      document.documentElement.classList.toggle("dark", dark);   // drives sheet + switch
+      themeSwitch.setAttribute("aria-checked", String(dark));
+    }
+    themeSwitch.addEventListener("click", () => {
+      theme = theme === "dark" ? "light" : "dark";
+      applyThemeUI();
+      settingsAPI.previewTheme(theme);   // live, real-time on the widget
     });
-    function commit() { settingsAPI.save({ url: input.value, openAtLogin: startup.checked }); }
-    save.addEventListener("click", commit);
-    document.getElementById("cancel").addEventListener("click", () => settingsAPI.cancel());
-    input.addEventListener("keydown", (e) => {
+
+    // Ask the main process to size the window to the sheet — that's the
+    // "expand on add" behaviour (no inner scrollbar).
+    function syncHeight() {
+      requestAnimationFrame(() => {
+        settingsAPI.resize(Math.ceil(sheet.getBoundingClientRect().height) + PAD * 2);
+      });
+    }
+
+    function recolor() {
+      list.querySelectorAll(".row").forEach((row, i) => {
+        row.querySelector(".dot").style.setProperty("--c", PALETTE[i % PALETTE.length]);
+      });
+    }
+
+    function addRow(value = "", focus = false) {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        '<span class="dot"></span>' +
+        '<input class="url" type="text" spellcheck="false" ' +
+          'placeholder="https://p…-caldav.icloud.com/published/2/…" />' +
+        '<button class="remove" title="Remove" tabindex="-1">&times;</button>';
+      const input = row.querySelector(".url");
+      input.value = value;
+      input.addEventListener("keydown", onKey);
+      row.querySelector(".remove").addEventListener("click", () => removeRow(row));
+      list.appendChild(row);
+      recolor();
+      syncHeight();
+      if (focus) { input.focus(); }
+      return input;
+    }
+
+    function removeRow(row) {
+      row.classList.add("leaving");
+      row.addEventListener("animationend", () => {
+        row.remove();
+        recolor();
+        syncHeight();
+      }, { once: true });
+    }
+
+    function collect() {
+      return Array.from(list.querySelectorAll(".url"))
+        .map((i) => i.value.trim())
+        .filter(Boolean);
+    }
+    function commit() { settingsAPI.save({ urls: collect(), openAtLogin: startup.checked, theme }); }
+
+    // Cancel discards everything, including any previewed theme — put the widget
+    // back to the last saved appearance before closing.
+    function cancel() {
+      if (theme !== savedTheme) settingsAPI.previewTheme(savedTheme);
+      settingsAPI.cancel();
+    }
+
+    function onKey(e) {
       if (e.key === "Enter") commit();
-      if (e.key === "Escape") settingsAPI.cancel();
+      if (e.key === "Escape") cancel();
+    }
+
+    document.getElementById("add").addEventListener("click", () => addRow("", true));
+    document.getElementById("save").addEventListener("click", commit);
+    document.getElementById("cancel").addEventListener("click", cancel);
+    document.getElementById("close").addEventListener("click", cancel);
+
+    settingsAPI.get().then((s) => {
+      const urls = (s.urls && s.urls.length) ? s.urls : [""];
+      urls.forEach((u) => addRow(u));
+      startup.checked = !!s.openAtLogin;
+      theme = savedTheme = s.theme === "dark" ? "dark" : "light";
+      applyThemeUI();
+      const first = list.querySelector(".url");
+      if (first) { first.focus(); first.select(); }
+      syncHeight();
     });
   </script>
 </body>
