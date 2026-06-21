@@ -44,14 +44,21 @@ body {
 /* Activated by ?overlay=1 — drops the demo backdrop so only the widget shows
    over your real wallpaper, fills the window, and lets the top bar drag it. */
 html.overlay, html.overlay body { background: transparent; }
-/* Small gutter so the OS resize edge sits just outside the visual border
-   (smaller = you can grab the resize handle closer to the widget edge). */
-html.overlay body { display: block; padding: 6px; }
-html.overlay .cal { width: 100%; height: 100%; margin: 0; }
+/* Fill the window edge-to-edge: no gutter and no outset drop shadow (it would
+   only render into dead space and get clipped). This puts the OS resize border
+   right at the widget's visible edge instead of out in a shadow halo. Keep just
+   the inner top highlight for definition. */
+html.overlay body { display: block; padding: 0; }
+html.overlay .cal {
+  width: 100%; height: 100%; margin: 0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
 html.overlay .cal-topbar { -webkit-app-region: drag; cursor: grab; }
 html.overlay .cal-evt,
 html.overlay .cal-scroll,
 html.overlay .cal-gear,
+html.overlay .cal-full,
+html.overlay .cal-close,
 html.overlay .cal-pop,
 html.overlay .cal-pop-backdrop { -webkit-app-region: no-drag; }
 
@@ -96,7 +103,7 @@ html.overlay .cal-pop-backdrop { -webkit-app-region: no-drag; }
   letter-spacing: -0.015em;
   color: var(--ink);
 }
-.cal-gear {
+.cal-gear, .cal-full {
   -webkit-app-region: no-drag;
   border: none;
   background: transparent;
@@ -109,7 +116,29 @@ html.overlay .cal-pop-backdrop { -webkit-app-region: no-drag; }
   border-radius: 6px;
   transition: opacity 0.12s ease, background 0.12s ease;
 }
-.cal-gear:hover { opacity: 1; background: rgba(60, 60, 67, 0.1); }
+.cal-gear:hover, .cal-full:hover { opacity: 1; background: rgba(60, 60, 67, 0.1); }
+/* Full-screen toggle: corner-bracket icon that flips expand⇄contract by state */
+.cal-full { display: inline-flex; align-items: center; justify-content: center; padding: 3px 4px; }
+.cal-full .cf-ico { width: 12px; height: 12px; display: block; }
+.cal-full .cf-contract { display: none; }
+.cal-full.is-full .cf-expand { display: none; }
+.cal-full.is-full .cf-contract { display: block; }
+.cal-bar-left { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.cal-actions { display: flex; align-items: center; gap: 1px; }
+.cal-close {
+  -webkit-app-region: no-drag;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--sub);
+  opacity: 0.55;
+  padding: 3px 5px;
+  border-radius: 6px;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.cal-close:hover { opacity: 1; background: rgba(255, 59, 48, 0.15); color: var(--today); }
 
 /* ── Day header row ───────────────────────────────────────────────────────── */
 .cal-headrow {
@@ -284,7 +313,8 @@ html.overlay .cal-pop-backdrop { -webkit-app-region: no-drag; }
   border-left: 2.5px solid var(--c);
   background: color-mix(in srgb, var(--c) 16%, white);
   color: color-mix(in srgb, var(--c) 78%, black);
-  transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease,
+              background-color 0.45s ease, color 0.45s ease;
 }
 .cal-block:hover {
   filter: saturate(1.05) brightness(0.99);
@@ -436,3 +466,64 @@ html.overlay .cal-pop-backdrop { -webkit-app-region: no-drag; }
   color: var(--ink-2);
   white-space: pre-wrap;
 }
+
+/* Cross-fade the themed surfaces when the appearance switch is flipped, so the
+   light↔dark change eases instead of snapping. (Only fires on class change;
+   the first paint is instant.) */
+.cal,
+.cal-topbar, .cal-headrow, .cal-allday,
+.cal-dayhead, .cal-spacer, .cal-allspacer,
+.cal-month, .cal-dow, .cal-dnum, .cal-time, .cal-hline, .cal-col {
+  transition: background-color 0.45s ease, color 0.45s ease,
+              border-color 0.45s ease, box-shadow 0.45s ease;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Dark mode — mirrors macOS dark-mode Calendar: #1c1c1e-family vibrancy,
+   white labels at Apple's descending opacities, #ff453a red. Activated by
+   <html class="dark"> (set from the ?theme=dark query and live over IPC).
+   ─────────────────────────────────────────────────────────────────────────── */
+html.dark {
+  --mat:        rgba(28, 28, 30, 0.72);
+  --mat-head:   rgba(60, 60, 66, 0.5);
+  --ink:        #ffffff;
+  --ink-2:      rgba(235, 235, 245, 0.85);
+  --sub:        rgba(235, 235, 245, 0.6);
+  --faint:      rgba(235, 235, 245, 0.3);
+  --line:       rgba(255, 255, 255, 0.12);
+  --line-soft:  rgba(255, 255, 255, 0.06);
+  --today:      #ff453a;
+}
+html.dark .cal {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0.5px 0 rgba(255, 255, 255, 0.08) inset,
+    0 24px 60px -12px rgba(0, 0, 0, 0.6),
+    0 6px 18px rgba(0, 0, 0, 0.4);
+}
+/* Overlay fills the window → keep only the inner highlight (see .overlay above) */
+html.dark.overlay .cal { box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.08) inset; }
+html.dark .cal-gear:hover, html.dark .cal-full:hover { background: rgba(255, 255, 255, 0.1); }
+html.dark .cal-allday { background: rgba(255, 255, 255, 0.04); }
+
+/* Event blocks: light mode mixes the calendar colour with white; dark mode
+   tints a dark translucent fill instead, with a light label. */
+html.dark .cal-block {
+  background: color-mix(in srgb, var(--c) 30%, rgba(28, 28, 30, 0.55));
+  color: #fff;
+}
+html.dark .cal-block:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--c) 70%, transparent);
+}
+
+html.dark .cal-sb-thumb { background: rgba(235, 235, 245, 0.3); }
+html.dark .cal-sb:hover .cal-sb-thumb,
+html.dark .cal-sb.is-dragging .cal-sb-thumb { background: rgba(235, 235, 245, 0.52); }
+
+html.dark .cal-pop {
+  background: rgba(44, 44, 46, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+html.dark .cal-pop-x { background: rgba(255, 255, 255, 0.12); color: var(--ink-2); }
+html.dark .cal-pop-x:hover { background: rgba(255, 255, 255, 0.22); }

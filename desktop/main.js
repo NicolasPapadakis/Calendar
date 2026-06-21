@@ -49,8 +49,8 @@ function createWindow() {
     hasShadow: false,             // the widget draws its own shadow in CSS
     resizable: true,
     skipTaskbar: true,            // it's a widget, not an app window
-    fullscreenable: false,
-    maximizable: false,
+    fullscreenable: false,        // "full screen" maximizes instead (see below)
+    maximizable: true,
     minimizable: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -69,10 +69,15 @@ function createWindow() {
     ready = true;
     if (pendingEvents) { win.webContents.send("events:update", pendingEvents); pendingEvents = null; }
     sendTheme(loadConfig().theme || "light");   // re-apply theme after any (re)load
+    applyPin(loadConfig().pin);                  // re-assert pin position after (re)load
+    sendFullscreen(win.isMaximized());           // sync the button's icon on (re)load
     capHeight();   // cap max height at the fully-revealed schedule (no grey gap)
     refresh();     // pull fresh events for this (re)load
     if (!(loadConfig().urls || []).length) openSettings();   // first-run prompt
   });
+
+  win.on("maximize", () => sendFullscreen(true));
+  win.on("unmaximize", () => { sendFullscreen(false); capHeight(); });
 }
 
 // Max useful height = current height + however much the time grid is still
@@ -111,6 +116,13 @@ function sendStatus(msg) {
 }
 function sendTheme(theme) {
   if (win && !win.isDestroyed() && ready) win.webContents.send("theme:update", theme);
+}
+function sendFullscreen(on) {
+  if (win && !win.isDestroyed() && ready) win.webContents.send("window:fullscreen", on);
+}
+// pin "top" → always on top; "background" (default) → normal stacking.
+function applyPin(pin) {
+  if (win && !win.isDestroyed()) win.setAlwaysOnTop(pin === "top");
 }
 
 async function refresh() {
@@ -161,21 +173,32 @@ app.whenReady().then(() => {
   ipcMain.on("events:refresh", refresh);
   ipcMain.on("settings:open", openSettings);
   ipcMain.on("window:close", () => app.quit());
+  ipcMain.on("window:toggle-fullscreen", () => {
+    if (!win || win.isDestroyed()) return;
+    // Use maximize, not OS fullscreen: transparent frameless windows often
+    // can't exit fullscreen on Windows. Lift the height cap before growing,
+    // else the window can't fill the screen; capHeight() re-applies on unmaximize.
+    if (!win.isMaximized()) { win.setMaximumSize(100000, 100000); win.maximize(); }
+    else win.unmaximize();
+  });
   ipcMain.handle("settings:get", () => {
     const cfg = loadConfig();
     return {
       urls: cfg.urls || [],
       openAtLogin: app.getLoginItemSettings().openAtLogin,
       theme: cfg.theme || "light",
+      pin: cfg.pin === "top" ? "top" : "background",
     };
   });
   ipcMain.on("settings:save", (_e, s) => {
     const cfg = loadConfig();
     cfg.urls = (s && s.urls) || [];
     cfg.theme = (s && s.theme) === "dark" ? "dark" : "light";
+    cfg.pin = (s && s.pin) === "top" ? "top" : "background";
     saveConfig(cfg);
     app.setLoginItemSettings({ openAtLogin: !!(s && s.openAtLogin) });
     sendTheme(cfg.theme);
+    applyPin(cfg.pin);
     closeSettings();
     refresh();
   });

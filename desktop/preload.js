@@ -28,13 +28,24 @@ ipcRenderer.on("theme:update", (_e, theme) => {
   themeHandlers.forEach((h) => h(theme));
 });
 
+// Buffer the window's fullscreen state so the topbar button's icon stays in
+// sync across reloads (render() rebuilds the button each time).
+let lastFullscreen = null;
+const fullscreenHandlers = [];
+ipcRenderer.on("window:fullscreen", (_e, on) => {
+  lastFullscreen = on;
+  fullscreenHandlers.forEach((h) => h(on));
+});
+
 // Widget API
 contextBridge.exposeInMainWorld("calendarBridge", {
   onEvents(cb) { eventHandlers.push(cb); if (lastEvents) cb(lastEvents); },
   onStatus(cb) { statusHandlers.push(cb); if (lastStatus) cb(lastStatus); },
   onTheme(cb) { themeHandlers.push(cb); if (lastTheme) cb(lastTheme); },
+  onFullscreen(cb) { fullscreenHandlers.push(cb); if (lastFullscreen != null) cb(lastFullscreen); },
   refresh() { ipcRenderer.send("events:refresh"); },
   openSettings() { ipcRenderer.send("settings:open"); },
+  toggleFullscreen() { ipcRenderer.send("window:toggle-fullscreen"); },
   closeWindow() { ipcRenderer.send("window:close"); },
 });
 
