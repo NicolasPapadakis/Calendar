@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Calendar Widget</title>
   <!-- Desktop shell loads this with ?overlay=1 → transparent, fills the window -->
-  <script>if (new URLSearchParams(location.search).has("overlay")) document.documentElement.classList.add("overlay");</script>
+  <script>
+    var q = new URLSearchParams(location.search);
+    if (q.has("overlay")) document.documentElement.classList.add("overlay");
+    if (q.get("theme") === "dark") document.documentElement.classList.add("dark");
+  </script>
   <!-- Windows fallback for SF Pro (closest matching metrics). Mac/iOS use SF directly. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,6 +21,15 @@
   <div id="cal" class="cal"></div>
 
   <script src="calendar.js"></script>
-  <script src="events.js"></script>
+  <script>
+    // events.js is dev-only sample data. Load it only in the browser — never in
+    // the packaged Electron shell, where real events arrive over IPC (and the
+    // file isn't bundled), so a user's calendar never ships baked into the app.
+    if (!new URLSearchParams(location.search).has("overlay")) {
+      var s = document.createElement("script");
+      s.src = "events.js";
+      document.body.appendChild(s);
+    }
+  </script>
 </body>
 </html>

@@ -49,6 +49,8 @@
   html.dark .ghost { background: rgba(255, 255, 255, 0.1); }
   html.dark .ghost:hover { background: rgba(255, 255, 255, 0.16); }
   html.dark .primary:hover { background: #3094ff; }
+  html.dark .seg { background: rgba(255, 255, 255, 0.06); }
+  html.dark .seg-btn.is-on { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
@@ -205,6 +207,35 @@
     font-size: 12.5px; color: var(--ink-2);
   }
   .startup input { -webkit-app-region: no-drag; width: 15px; height: 15px; accent-color: var(--accent); }
+
+  /* ── Pin position — Apple-style segmented control ───────────────────────── */
+  .opt {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 11px;
+    font-size: 12.5px; color: var(--ink-2);
+  }
+  .seg {
+    -webkit-app-region: no-drag;
+    display: flex; gap: 2px; padding: 2px;
+    background: rgba(60, 60, 67, 0.08);
+    border: 0.5px solid var(--line);
+    border-radius: 9px;
+  }
+  .seg-btn {
+    font-family: var(--font);
+    font-size: 12px; font-weight: 600;
+    color: var(--sub);
+    background: transparent;
+    border: none; border-radius: 7px;
+    padding: 4px 13px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .seg-btn.is-on {
+    background: var(--field);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
   .foot {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 15px 15px;
@@ -281,6 +312,13 @@
       <div id="list"></div>
       <button class="add" id="add"><span class="add-plus">+</span> Add calendar</button>
       <label class="startup"><input id="startup" type="checkbox" /> Open automatically when I log in</label>
+      <div class="opt">
+        <span class="opt-label">Pin to</span>
+        <div class="seg" id="pin" role="radiogroup" aria-label="Pin position">
+          <button class="seg-btn" type="button" data-pin="background" role="radio">Background</button>
+          <button class="seg-btn" type="button" data-pin="top" role="radio">Top</button>
+        </div>
+      </div>
     </div>
     <div class="foot">
       <button class="theme-switch" id="theme" role="switch" aria-checked="false"
@@ -315,6 +353,18 @@
     const sheet = document.querySelector(".sheet");
     const startup = document.getElementById("startup");
     const themeSwitch = document.getElementById("theme");
+    const pinGroup = document.getElementById("pin");
+
+    let pin = "background";   // "background" | "top"
+    function applyPinUI() {
+      pinGroup.querySelectorAll(".seg-btn").forEach((b) => {
+        const on = b.dataset.pin === pin;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-checked", String(on));
+      });
+    }
+    pinGroup.querySelectorAll(".seg-btn").forEach((b) =>
+      b.addEventListener("click", () => { pin = b.dataset.pin; applyPinUI(); }));
 
     let theme = "light";        // current (previewed) theme
     let savedTheme = "light";   // theme to revert to if the user cancels
@@ -376,7 +426,7 @@
         .map((i) => i.value.trim())
         .filter(Boolean);
     }
-    function commit() { settingsAPI.save({ urls: collect(), openAtLogin: startup.checked, theme }); }
+    function commit() { settingsAPI.save({ urls: collect(), openAtLogin: startup.checked, theme, pin }); }
 
     // Cancel discards everything, including any previewed theme — put the widget
     // back to the last saved appearance before closing.
@@ -399,6 +449,8 @@
       const urls = (s.urls && s.urls.length) ? s.urls : [""];
       urls.forEach((u) => addRow(u));
       startup.checked = !!s.openAtLogin;
+      pin = s.pin === "top" ? "top" : "background";
+      applyPinUI();
       theme = savedTheme = s.theme === "dark" ? "dark" : "light";
       applyThemeUI();
       const first = list.querySelector(".url");

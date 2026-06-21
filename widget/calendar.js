@@ -26,7 +26,8 @@
   "use strict";
 
   // ── Layout constants ──────────────────────────────────────────────────────
-  const HOUR_H   = 28;            // px per hour row (compact — ~40% shorter)
+  const BASE_HOUR_H = 28;         // px per hour row when scrolling (compact)
+  let   HOUR_H   = BASE_HOUR_H;   // grows to fill the viewport when maximized
   const GUTTER   = 46;            // px width of the hour-label gutter
   const WIN_BACK = 1;             // days shown before today (yesterday)
   const WIN_DAYS = 7;             // total columns
@@ -41,6 +42,8 @@
   let root, scrollEl, nowEl, didAutoScroll = false;
   let sbEl, sbThumb, sbHideTimer;
   let lastStatus = "";
+  let isFull = false;             // mirrors the window's fullscreen state
+  let resizeRAF = 0;              // throttles resize → re-fit to one per frame
 
   // ── Public API ────────────────────────────────────────────────────────────
   const Calendar = {
@@ -60,11 +63,13 @@
     if (window.calendarBridge) {                    // Electron: data comes over IPC
       window.calendarBridge.onEvents((evts) => Calendar.setEvents(evts));
       window.calendarBridge.onStatus(setStatus);
+      window.calendarBridge.onTheme(setTheme);
+      window.calendarBridge.onFullscreen(setFullscreen);
     } else {
       tryLoadJson();                                // browser dev: optional events.json
     }
     setInterval(updateNow, 30 * 1000);              // keep the red line live
-    window.addEventListener("resize", updateScrollbar);
+    window.addEventListener("resize", onResize);
   }
 
   // ── Date helpers ──────────────────────────────────────────────────────────
@@ -165,8 +170,17 @@
     const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(now);
 
     root.innerHTML = `
-      <div class="cal-topbar"><span class="cal-month">${monthLabel}</span>${
-        window.calendarBridge ? `<button class="cal-gear" title="Settings" aria-label="Settings">⚙</button>` : ""
+      <div class="cal-topbar">
+        <div class="cal-bar-left">${
+          window.calendarBridge ? `<button class="cal-gear" title="Settings" aria-label="Settings">⚙</button>` : ""
+        }<span class="cal-month">${monthLabel}</span></div>${
+        window.calendarBridge ? `<div class="cal-actions">
+          <button class="cal-full${isFull ? " is-full" : ""}" title="${isFull ? "Exit full screen" : "Full screen"}" aria-label="Full screen">
+            <svg class="cf-ico cf-expand" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/></svg>
+            <svg class="cf-ico cf-contract" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2V6H2M10 2v4h4M6 14v-4H2M10 14v-4h4"/></svg>
+          </button>
+          <button class="cal-close" title="Close" aria-label="Close">✕</button>
+        </div>` : ""
       }</div>
       <div class="cal-headrow">
         <div class="cal-spacer"></div>
@@ -202,9 +216,22 @@
       e.stopPropagation();
       window.calendarBridge && window.calendarBridge.openSettings();
     });
+
+    const full = root.querySelector(".cal-full");
+    if (full) full.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.calendarBridge && window.calendarBridge.toggleFullscreen();
+    });
+
+    const closeBtn = root.querySelector(".cal-close");
+    if (closeBtn) closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.calendarBridge && window.calendarBridge.closeWindow();
+    });
     applyStatus();   // re-attach any standing status message (innerHTML wiped it)
 
     scrollEl = root.querySelector(".cal-scroll");
+    if (applyHourHeight()) { render(); return; }   // grow rows to fill a tall (maximized) window
     nowEl = root.querySelector("#cal-now");
     updateNow();
     setupScrollbar();
@@ -247,6 +274,28 @@
     const top = (scrollEl.scrollTop / (ch - vh)) * (vh - thumbH);
     sbThumb.style.height = thumbH + "px";
     sbThumb.style.transform = `translateY(${top}px)`;
+  }
+
+  // When the scroll area is taller than the compact 24h grid (e.g. the window is
+  // maximized), stretch each hour row so the grid fills it instead of leaving
+  // dead space below; otherwise keep BASE_HOUR_H and let it scroll. Returns true
+  // when HOUR_H changed, so the caller can re-render with the new height.
+  function applyHourHeight() {
+    if (!scrollEl) return false;
+    const avail = scrollEl.clientHeight;
+    if (!avail) return false;
+    const fit = Math.max(BASE_HOUR_H, avail / 24);
+    if (Math.abs(fit - HOUR_H) > 0.5) { HOUR_H = fit; return true; }
+    return false;
+  }
+
+  function onResize() {
+    if (resizeRAF) return;
+    resizeRAF = requestAnimationFrame(() => {
+      resizeRAF = 0;
+      if (applyHourHeight()) render();   // height band changed → re-lay the grid
+      else updateScrollbar();            // width-only change → cheap path
+    });
   }
 
   function startScrollDrag(e) {
@@ -411,6 +460,21 @@
       return base + ", until " + new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(u);
     }
     return base;
+  }
+
+  // ── Theme (light / Apple dark) — toggles CSS vars; blocks recolour via CSS ──
+  function setTheme(theme) {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }
+
+  // ── Fullscreen state — flips the topbar button's icon expand⇄contract ──────
+  function setFullscreen(on) {
+    isFull = !!on;
+    const b = root && root.querySelector(".cal-full");
+    if (b) {
+      b.classList.toggle("is-full", isFull);
+      b.title = isFull ? "Exit full screen" : "Full screen";
+    }
   }
 
   // ── Status toast (load errors / "set up your calendar") ───────────────────
