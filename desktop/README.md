@@ -40,7 +40,7 @@ into the app, so the same build is safe to share.
 | **Click an event** | Opens its detail popover |
 | **Settings** | ⚙ gear (top-right of the bar) |
 | **Quit** | `Ctrl + Shift + Q` |
-| **Bring to front / send back** | `Ctrl + Shift + T` (toggles always-on-top) |
+| **Keep on top / in background** | Settings → **Pin to** |
 | **Reload / refetch** | `Ctrl + Shift + R` |
 
 ## Build a shippable installer
@@ -64,7 +64,7 @@ Notes:
 
 On Windows, Electron can't glue a window *behind* the desktop icons without native
 Win32 hooks. So this floats like a pinned panel (think Rainmeter): it stays where you
-put it, but another window can cover it — use `Ctrl + Shift + T` to pop it back.
+put it, but another window can cover it — set Settings → **Pin to → Top** to keep it in front.
 
 ## Auto-start with Windows
 

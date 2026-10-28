@@ -12,7 +12,6 @@ const { fetchEventsFromUrls } = require("./calendar-data");
 const REFRESH_MS = 15 * 60 * 1000;                 // re-fetch the feed every 15 min
 
 let win, settingsWin;
-let onTop = false;
 let ready = false;          // true once the renderer has finished loading
 let pendingEvents = null;   // events that arrived before the renderer was ready
 
@@ -219,11 +218,6 @@ app.whenReady().then(() => {
 
   // Quit (no title bar to close from)
   globalShortcut.register("CommandOrControl+Shift+Q", () => app.quit());
-  // Bring it forward when buried under windows, or send it back
-  globalShortcut.register("CommandOrControl+Shift+T", () => {
-    onTop = !onTop;
-    win.setAlwaysOnTop(onTop);
-  });
   // Reload — refetches the feed and redraws
   globalShortcut.register("CommandOrControl+Shift+R", () => win.reload());
 

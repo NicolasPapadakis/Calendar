@@ -1,14 +1,10 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
+# Build output
 dist/
-wheels/
-*.egg-info
 
-#Claude
+desktop/package.json
+
+# Claude
 .claude/
 CLAUDE.md
 
-# Virtual environments
-.venv
+.vscode/
