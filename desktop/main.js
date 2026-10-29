@@ -4,7 +4,7 @@
 // This process owns the data layer (formerly main.py): it fetches the published
 // iCloud ICS feed, parses it with node-ical, converts each VEVENT into the
 // widget's event shape, and pushes the result into the renderer over IPC.
-const { app, BrowserWindow, globalShortcut, screen, ipcMain } = require("electron");
+const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { fetchEventsFromUrls } = require("./calendar-data");
@@ -157,6 +157,11 @@ function openSettings() {
     },
   });
   settingsWin.setMenuBarVisibility(false);
+  // Help links open in the user's browser, not a new Electron window.
+  settingsWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://")) shell.openExternal(url);
+    return { action: "deny" };
+  });
   settingsWin.loadFile(path.join(__dirname, "settings.html"), {
     search: loadConfig().theme === "dark" ? "theme=dark" : "",
   });

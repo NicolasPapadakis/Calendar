@@ -111,6 +111,12 @@
   /* ── Body ───────────────────────────────────────────────────────────────── */
   .body { padding: 13px 15px 4px; }
   .hint { font-size: 11.5px; color: var(--sub); line-height: 1.4; margin-bottom: 11px; }
+  .hint a {
+    -webkit-app-region: no-drag;
+    display: block; margin-top: 4px;
+    color: var(--accent); text-decoration: none;
+  }
+  .hint a:hover { text-decoration: underline; }
   .hint code {
     font-family: "SF Mono", ui-monospace, Menlo, monospace;
     font-size: 10.5px;
@@ -308,7 +314,9 @@
     </div>
     <div class="body">
       <p class="hint">Paste your iCloud <b>public</b> calendar links (Calendar → Share → Public Calendar).
-         <code>webcal://</code> and <code>https://</code> both work.</p>
+         <code>webcal://</code> and <code>https://</code> both work.
+         <a href="https://github.com/NicolasPapadakis/Calendar/blob/main/README.md#apple-icloud-calendar"
+            target="_blank">Find your iCal link for iCloud and Google Calendar</a></p>
       <div id="list"></div>
       <button class="add" id="add"><span class="add-plus">+</span> Add calendar</button>
       <label class="startup"><input id="startup" type="checkbox" /> Open automatically when I log in</label>
